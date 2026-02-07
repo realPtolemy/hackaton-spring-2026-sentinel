@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 API_KEY = os.getenv("GOOGLE_API_KEY") 
-CONVENTION_FILE_PATH = "conventions.md" 
+STYLE_CONVENTIONS_FILE_PATH = "docs/CONVENTIONS.md"
+STYLE_EXCEPTIONS_FILE_PATH =  "docs/EXCEPTIONS.md"
 SOURCE_DIR = "./src"
 SKIP_EXTENSIONS = [".pyc", ".git", ".md", "_pr.py", "_pr.js"] # Avoid re-processing output files
 
@@ -98,11 +99,11 @@ def refactor_code(filepath, code_content, rules_checklist):
 
 def main():
     # 1. Read the convention file
-    if not os.path.exists(CONVENTION_FILE_PATH):
-        print(f"❌ Error: Convention file '{CONVENTION_FILE_PATH}' not found.")
+    if not os.path.exists(STYLE_CONVENTIONS_FILE_PATH):
+        print(f"❌ Error: Convention file '{STYLE_CONVENTIONS_FILE_PATH}' not found.")
         return
 
-    with open(CONVENTION_FILE_PATH, "r", encoding="utf-8") as f:
+    with open(STYLE_CONVENTIONS_FILE_PATH, "r", encoding="utf-8") as f:
         raw_conventions = f.read()
 
     # 2. Run the Convention Analyst Agent
