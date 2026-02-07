@@ -7,11 +7,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class MultiAgentReviewer:
-    def __init__(self, api_key, model_name="gemini-2.0-flash", convention_path="conventions.md"):
-        # In the new SDK, we initialize a client instead of global config
+    def __init__(self, api_key, model_name="gemini-2.0-flash", convention_path="./docs/CONVENTIONS.md", exception_path="./docs/EXCEPTIONS.md"):
         self.client = genai.Client(api_key=api_key)
         self.model_name = model_name
         self.convention_path = convention_path
+        self.exceptions = exception_path
         self.rules_checklist = None
 
     def get_expert_persona(self, file_extension):

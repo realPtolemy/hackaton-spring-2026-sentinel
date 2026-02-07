@@ -13,23 +13,33 @@ st.set_page_config(layout="wide", page_title="Multi-Agent Reviewer", page_icon="
 if "reviewer" not in st.session_state:
     st.session_state.reviewer = MultiAgentReviewer(api_key=os.getenv("GOOGLE_API_KEY"))
 
-# --- Helper Logic ---
-
 def get_git_modified_files():
-    """Finds Modified/Added files specifically in the src/ folder."""
+    """Finds Modified, Added (Staged), and Untracked (New) files in WATCH_DIR."""
     try:
-        # We add the WATCH_DIR argument to the git command to limit results to that path
-        cmd = ["git", "diff", "--name-only", "--diff-filter=ACM", "--", WATCH_DIR]
-        files = subprocess.check_output(cmd, encoding='utf-8').splitlines()
+        cmd_mod = ["git", "diff", "--name-only", "--diff-filter=ACM", "--", WATCH_DIR]
+        modified = subprocess.check_output(cmd_mod, encoding='utf-8').splitlines()
         
         cmd_staged = ["git", "diff", "--name-only", "--diff-filter=ACM", "--cached", "--", WATCH_DIR]
         staged = subprocess.check_output(cmd_staged, encoding='utf-8').splitlines()
         
-        all_mod = set(files + staged)
-        # Ensure we only track existing files and avoid processing our own _pr outputs
-        return [f for f in all_mod if PR_SUFFIX not in f and os.path.exists(f)]
+        cmd_untracked = ["git", "ls-files", "--others", "--exclude-standard", "--", WATCH_DIR]
+        untracked = subprocess.check_output(cmd_untracked, encoding='utf-8').splitlines()
+        
+
+        all_changed = set(modified + staged + untracked)
+        
+        valid_files = []
+        for f in all_changed:
+            path = Path(f)
+            if path.exists() and PR_SUFFIX not in path.name:
+                valid_files.append(str(path))
+                
+        return valid_files
+
+    except subprocess.CalledProcessError:
+        return []
     except Exception as e:
-        # If not a git repo or folder doesn't exist, return empty
+        st.error(f"Error scanning git files: {e}")
         return []
 
 # --- UI ---

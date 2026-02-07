@@ -1,26 +1,26 @@
 class CalculationEngine:
-    """
+  """
     A class that performs calculations.
     """
 
-    PI_VALUE = 3.14
-    """Constant representing Pi."""
+  PI_VALUE: float = 3.14
+  """Constant representing Pi."""
 
-    def add(self, x: float, y: float) -> float:
-        """
+  def add(self, first_number: float, second_number: float) -> float:
+    """
         Adds two numbers together.
 
         Args:
-            x: The first number.
-            y: The second number.
+            first_number: The first number.
+            second_number: The second number.
 
         Returns:
             The sum of the two numbers.
         """
-        return x + y
+    return first_number + second_number
 
-    def circle_area(self, radius: float) -> float:
-        """
+  def circle_area(self, radius: float) -> float:
+    """
         Calculates the area of a circle.
 
         Args:
@@ -29,24 +29,24 @@ class CalculationEngine:
         Returns:
             The area of the circle.
         """
-        # Using a constant for pi to improve readability and maintainability.
-        return self.PI_VALUE * radius * radius
+    # Using a constant for pi to improve readability and maintainability.
+    return self.PI_VALUE * radius * radius
 
-    def risky_operation(self) -> None:
-        """
+  def risky_operation(self) -> None:
+    """
         Demonstrates exception handling for a risky operation.
         """
-        try:
-            # Intentionally attempting division by zero to demonstrate exception handling.
-            ONE = 1
-            ZERO = 0
-            ONE / ZERO
-        except ZeroDivisionError as e:
-            # Catching the specific exception to handle it gracefully.
-            print(f"Caught ZeroDivisionError: {e}")
+    try:
+      # Intentionally attempting division by zero to demonstrate exception handling.
+      one: int = 1
+      zero: int = 0
+      one / zero
+    except ZeroDivisionError as error:
+      # Catching the specific exception to handle it gracefully.
+      print(f"Caught ZeroDivisionError: {error}")
 
-    def area(self, radius: float) -> float:
-        """
+  def area(self, radius: float) -> float:
+    """
         Calculates the area of a circle.
 
         Args:
@@ -55,5 +55,8 @@ class CalculationEngine:
         Returns:
             The area of the circle.
         """
-        # Using a constant for pi to improve readability and maintainability.
-        return self.PI_VALUE * radius * radius
+    # Using a constant for pi to improve readability and maintainability.
+    return self.PI_VALUE * radius * radius
+
+  def some_unclear_function(self, input_value: str) -> str:
+    return ""
