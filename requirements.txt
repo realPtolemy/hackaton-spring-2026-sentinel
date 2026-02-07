@@ -1,5 +1,6 @@
 google-generativeai
 dotenv
+tomli
 pre-commit
 clang-format
 clang-tidy
