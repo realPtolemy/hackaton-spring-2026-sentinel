@@ -21,7 +21,7 @@ Consistency is enforced automatically. If your code isn't formatted correctly, *
 
 ### 4. Local Exceptions
 
-*Refer to [exceptions.md](https://www.google.com/search?q=./exceptions.md) for deviations from Google's standards (e.g., our 120-character line limit).*
+*Refer to [EXCEPTIONS.md](https://www.google.com/search?q=./exceptions.md) for deviations from Google's standards (e.g., our 120-character line limit).*
 
 ### 5. Manual Review Focus
 
