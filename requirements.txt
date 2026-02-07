@@ -5,4 +5,5 @@ pre-commit
 clang-format
 clang-tidy
 cpplint
+streamlit
 yapf
