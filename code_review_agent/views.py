@@ -58,17 +58,22 @@ def render_sidebar(orchestrator, modified_files):
     
     if unprocessed_files:
         if st.sidebar.button("🤖 Process All Files", type="primary", use_container_width=True):
-            progress_bar = st.sidebar.progress(0)
-            for i, f in enumerate(unprocessed_files):
-                p = Path(f)
-                pr_path = p.parent / f"{p.stem}_pr{p.suffix}"
-                
-                with st.spinner(f"Squad refactoring {p.name}..."):
-                    code = p.read_text(encoding="utf-8")
-                    fixed_code = orchestrator.sync_refactor(str(p), code)
+            with st.spinner(f"Squad parallel reviewing {len(unprocessed_files)} files..."):
+                # 1. Prepare the batch data
+                batch_input = []
+                for f in unprocessed_files:
+                    p = Path(f)
+                    batch_input.append((str(p), p.read_text(encoding="utf-8")))
+
+                # 2. Call the NEW batch refactor (True Parallelism)
+                # This triggers all files and all agents at once
+                all_results = orchestrator.sync_batch_refactor(batch_input)
+
+                # 3. Save the results
+                for file_path, fixed_code in all_results.items():
+                    p = Path(file_path)
+                    pr_path = p.parent / f"{p.stem}_pr{p.suffix}"
                     pr_path.write_text(fixed_code, encoding="utf-8")
-                
-                progress_bar.progress((i + 1) / len(unprocessed_files))
             
             st.rerun()
     

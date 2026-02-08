@@ -24,6 +24,22 @@ class Orchestrator:
     def _read_file(self, path):
         p = Path(path)
         return p.read_text(encoding="utf-8") if p.exists() else ""
+    
+    async def review_multiple_files(self, file_data_list):
+        """
+        file_data_list: A list of tuples/dicts e.g., [("file1.py", "code..."), ("file2.js", "code...")]
+        """
+        results = {}
+
+        async def _process_and_store(path, code):
+            refactored = await self.review_flow(path, code)
+            results[path] = refactored
+
+        async with trio.open_nursery() as nursery:
+            for path, code in file_data_list:
+                nursery.start_soon(_process_and_store, path, code)
+        
+        return results
 
     async def review_flow(self, file_path, code_content=None):
         """
@@ -77,6 +93,11 @@ class Orchestrator:
     def sync_digest_rules(self):
         """Returns the loaded rules text for the Hero section."""
         return f"{self.conventions}\n\n{self.exceptions}"
+    
+    def sync_batch_refactor(self, file_data_list):
+        """Runs the full multi-file async loop for the UI."""
+        import trio
+        return trio.run(self.review_multiple_files, file_data_list)
 
     def sync_refactor(self, path_str, code):
         """Runs the async trio loop for the UI."""
