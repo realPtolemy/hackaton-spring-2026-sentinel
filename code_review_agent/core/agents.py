@@ -1,16 +1,15 @@
 import trio
 from google.genai import types 
 
-MAX_CONCURRENT_FILES = 5
-MODEL_NAME = "gemini-2.0-flash"
+MODEL_NAME = "gemini-2.5-flash"
 
-class ReviewAgents:
-    """Personas and prompt logic for the MAS."""
+class SpecialistSquad:
+    """A squad of specialized agents for polyglot code review."""
     def __init__(self, client):
         self.client = client
 
-    async def call_llm(self, prompt, system_instruction):
-        """Standardized async wrapper for LLM calls."""
+    async def _call_llm(self, prompt, system_instruction):
+        """Standard async wrapper for Gemini calls."""
         response = await trio.to_thread.run_sync(
             lambda: self.client.models.generate_content(
                 model=MODEL_NAME, 
@@ -23,18 +22,66 @@ class ReviewAgents:
         )
         return response.text
 
-    async def lawyer(self, language, conventions, exceptions, tooling):
-        sys = "You are the Code Lawyer. You define strict legal frameworks for codebases."
-        prompt = f"Define a checklist for {language}.\nConventions: {conventions}\nExceptions: {exceptions}\nTooling: {tooling}\nRULE: Forbid renaming public APIs."
-        return await self.call_llm(prompt, sys)
+    # --- The Specialists ---
 
-    async def detective(self, code, ruleset, language):
-        sys = f"You are the {language} Detective. You find violations with surgical precision."
-        prompt = f"Rules: {ruleset}\nCode: {code}\nTask: List violations. If none, return 'NO_VIOLATIONS'."
-        return await self.call_llm(prompt, sys)
+    async def optimizer_agent(self, code, language):
+        sys = f"You are a Senior Performance Engineer specialized in {language}. Your goal is Efficiency."
+        prompt = f"""
+        Analyze this code:
+        {code}
+        
+        Task: Identify O(n^2) loops, memory leaks, redundant computations, or inefficient data structures.
+        Output: A concise bulleted list of specific optimization steps.
+        """
+        return await self._call_llm(prompt, sys)
 
-    async def diplomat(self, code, violations, language):
-        sys = "You are the Diplomat. You refactor code while maintaining public API stability."
-        prompt = f"Original Code: {code}\nViolations: {violations}\nTask: Rewrite code. Fix internal style but NEVER change public signatures."
-        raw = await self.call_llm(prompt, sys)
+    async def enforcer_agent(self, code, language, conventions, exceptions):
+        sys = f"You are the {language} Policy Enforcer. You uphold the Company CONVENTIONS strictly."
+        prompt = f"""
+        Conventions: {conventions}
+        Exceptions: {exceptions}
+        Code:
+        {code}
+        
+        Task: List deviations from the style guide. Focus on naming, banned functions, and architectural patterns.
+        Output: A concise bulleted list of violations.
+        """
+        return await self._call_llm(prompt, sys)
+
+    async def documenter_agent(self, code, language):
+        sys = f"You are the Lead Technical Writer for {language}."
+        prompt = f"""
+        Analyze this code:
+        {code}
+        
+        Task: Identify where Javadoc/Docstrings/Comments are missing or unclear. 
+        Output: A list of where comments should be added to explain 'WHY', not just 'WHAT'.
+        """
+        return await self._call_llm(prompt, sys)
+
+    # --- The Mentor (Synthesis) ---
+
+    async def mentor_agent(self, code, language, optimization_report, policy_report, documentation_report):
+        sys = f"""You are a Principal {language} Mentor. 
+        Synthesize feedback from your team and rewrite the user's code.
+        Be encouraging but firm about quality."""
+
+        prompt = f"""
+        ORIGINAL CODE:
+        {code}
+
+        TEAM REPORTS:
+        1. Optimization: {optimization_report}
+        2. Policy: {policy_report}
+        3. Docs: {documentation_report}
+
+        YOUR MISSION:
+        1. Refactor the code to address ALL points (make it faster, clean, and well-documented).
+        2. Create a top-level block comment (using {language} syntax) at the VERY TOP of the file.
+           - Summarize changes.
+           - Give specific guidance based on mistakes found.
+        3. Output ONLY the code. No markdown backticks.
+        """
+        raw = await self._call_llm(prompt, sys)
+        # Clean up markdown if the model returns it
         return raw.replace(f"```{language.lower()}", "").replace("```", "").strip()

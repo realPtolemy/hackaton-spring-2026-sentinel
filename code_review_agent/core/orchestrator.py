@@ -1,27 +1,19 @@
-import os
 import trio
-import random
 from pathlib import Path
 from google import genai
 from dotenv import load_dotenv
-from .agents import ReviewAgents
+from .agents import SpecialistSquad
 from .tools import CodeTools
 
 load_dotenv()
 
-# --- Configuration ---
-MAX_CONCURRENT_FILES = 5
-MODEL_NAME = "gemini-2.0-flash"
-
 class Orchestrator:
-    """The MAS Manager that controls the workflow and concurrency."""
+    """The Manager that routes code to the correct language squad."""
     def __init__(self, api_key):
         self.client = genai.Client(api_key=api_key)
-        self.agents = ReviewAgents(self.client)
+        self.squad = SpecialistSquad(self.client)
         self.tools = CodeTools()
-        self.rules_cache = {}
         
-        # Load static context
         self.conventions = self._read_file("./docs/CONVENTIONS.md")
         self.exceptions = self._read_file("./docs/EXCEPTIONS.md")
 
@@ -30,41 +22,60 @@ class Orchestrator:
         return p.read_text(encoding="utf-8") if p.exists() else ""
 
     async def review_flow(self, file_path, code_content=None):
-        """The logical 'brain' that sequences agent interactions."""
+        """
+        Parallel Agent Workflow:
+        1. Identify Language.
+        2. Spawn 3 specialist agents (Optimize, Policy, Comment).
+        3. Mentor synthesizes results.
+        """
         p = Path(file_path)
         lang = self.tools.get_lang_name(p.suffix)
         
+        if lang == "Unknown Language":
+            return f"// Skipping {file_path}: Language not supported."
+
         if not code_content:
             code_content = await trio.to_thread.run_sync(lambda: p.read_text(encoding="utf-8"))
 
-        # 1. Lawyer drafting (with caching)
-        if lang not in self.rules_cache:
-            tooling = self.tools.detect_tooling()
-            self.rules_cache[lang] = await self.agents.lawyer(lang, self.conventions, self.exceptions, tooling)
+        # --- Parallel Execution in Trio Nursery ---
+        async with trio.open_nursery() as nursery:
+            results = [None, None, None] # Mutable container for results
+            
+            # 1. Optimizer Task
+            nursery.start_soon(self._run_agent, self.squad.optimizer_agent, 
+                               (code_content, lang), results, 0)
+            
+            # 2. Enforcer Task
+            nursery.start_soon(self._run_agent, self.squad.enforcer_agent, 
+                               (code_content, lang, self.conventions, self.exceptions), results, 1)
+            
+            # 3. Documenter Task
+            nursery.start_soon(self._run_agent, self.squad.documenter_agent, 
+                               (code_content, lang), results, 2)
+
+        opt_report, policy_report, doc_report = results
+
+        # --- Mentor Synthesis ---
+        final_code = await self.squad.mentor_agent(
+            code=code_content,
+            language=lang,
+            optimization_report=opt_report,
+            policy_report=policy_report,
+            documentation_report=doc_report
+        )
         
-        rules = self.rules_cache[lang]
+        return final_code
 
-        # 2. Detective investigation
-        violations = await self.agents.detective(code_content, rules, lang)
-        
-        if "NO_VIOLATIONS" in violations:
-            return code_content, False
-
-        # 3. Diplomat resolution
-        fixed_code = await self.agents.diplomat(code_content, violations, lang)
-        return fixed_code, True
-
-    # --- Trio Entry Points ---
+    async def _run_agent(self, func, args, result_list, index):
+        """Helper to store agent result in specific index."""
+        result_list[index] = await func(*args)
+    
     def sync_digest_rules(self):
-        """Streamlit-friendly way to get the 'Legal' rules."""
-        async def _run():
-            tooling = self.tools.detect_tooling()
-            return await self.agents.lawyer("General", self.conventions, self.exceptions, tooling)
-        return trio.run(_run)
+        """Returns the loaded rules text for the Hero section."""
+        return f"{self.conventions}\n\n{self.exceptions}"
 
     def sync_refactor(self, path_str, code):
-        """Streamlit-friendly way to run the full MAS flow."""
+        """Runs the async trio loop for the UI."""
         async def _run():
-            fixed, changed = await self.review_flow(path_str, code)
-            return fixed
+            return await self.review_flow(path_str, code)
         return trio.run(_run)
