@@ -15,6 +15,33 @@ def render_hero_section(rules):
     with st.expander("⚖️ Active Company Policy"):
         st.markdown(rules)
 
+# def render_sidebar(orchestrator, modified_files):
+#     st.sidebar.header("📁 Git Changes (src)")
+    
+#     valid_files = [f for f in modified_files if Path(f).exists()]
+    
+#     if not valid_files:
+#         st.sidebar.success("🎉 All files reviewed!")
+#         st.sidebar.info("No modified files found in git (unstaged).")
+#         return
+
+#     for f in valid_files:
+#         p = Path(f)
+#         pr_path = p.parent / f"{p.stem}_pr{p.suffix}"
+        
+#         col_l, col_r = st.sidebar.columns([0.8, 0.2])
+#         col_l.caption(f"📄 {f}")
+        
+#         if pr_path.exists():
+#             col_r.write("✅")
+#         else:
+#             if col_r.button("🤖", key=f"btn_{f}", help=f"Run Agent Squad on {f}"):
+#                 with st.spinner(f"Squad refactoring {p.name}..."):
+#                     code = p.read_text(encoding="utf-8")
+#                     fixed_code = orchestrator.sync_refactor(str(p), code)
+#                     pr_path.write_text(fixed_code, encoding="utf-8")
+#                     st.rerun()
+
 def render_sidebar(orchestrator, modified_files):
     st.sidebar.header("📁 Git Changes (src)")
     
@@ -25,6 +52,29 @@ def render_sidebar(orchestrator, modified_files):
         st.sidebar.info("No modified files found in git (unstaged).")
         return
 
+    # --- NEW: PROCESS ALL BUTTON ---
+    # Only show if there are files that haven't been processed yet
+    unprocessed_files = [f for f in valid_files if not (Path(f).parent / f"{Path(f).stem}_pr{Path(f).suffix}").exists()]
+    
+    if unprocessed_files:
+        if st.sidebar.button("🤖 Process All Files", type="primary", use_container_width=True):
+            progress_bar = st.sidebar.progress(0)
+            for i, f in enumerate(unprocessed_files):
+                p = Path(f)
+                pr_path = p.parent / f"{p.stem}_pr{p.suffix}"
+                
+                with st.spinner(f"Squad refactoring {p.name}..."):
+                    code = p.read_text(encoding="utf-8")
+                    fixed_code = orchestrator.sync_refactor(str(p), code)
+                    pr_path.write_text(fixed_code, encoding="utf-8")
+                
+                progress_bar.progress((i + 1) / len(unprocessed_files))
+            
+            st.rerun()
+    
+    st.sidebar.divider()
+
+    # --- INDIVIDUAL FILE ROW RENDERER ---
     for f in valid_files:
         p = Path(f)
         pr_path = p.parent / f"{p.stem}_pr{p.suffix}"
