@@ -48,23 +48,29 @@ class SpecialistSquad:
         """
         return await self._call_llm(prompt, sys)
 
+
     async def documenter_agent(self, code, language):
-        sys = f"You are the Lead Technical Writer for {language}."
+        sys = f"You are the Lead Technical Writer for {language}. You hate redundancy."
         prompt = f"""
         Analyze this code:
         {code}
         
-        Task: Identify where Javadoc/Docstrings/Comments are missing or unclear. 
-        Output: A list of where comments should be added to explain 'WHY', not just 'WHAT'.
+        Task: Identify where comments are critical.
+        Rules:
+        1. IGNORE getters, setters, and obvious logic.
+        2. ONLY flag complex algorithms or non-obvious business logic.
+        3. If the code is self-explanatory, return 'NO_COMMENTS_NEEDED'.
+        
+        Output: A concise list of strictly necessary documentation updates.
         """
         return await self._call_llm(prompt, sys)
 
     # --- The Mentor (Synthesis) ---
-
     async def mentor_agent(self, code, language, optimization_report, policy_report, documentation_report):
-        sys = f"""You are a Principal {language} Mentor. 
-        Synthesize feedback from your team and rewrite the user's code.
-        Be encouraging but firm about quality."""
+        sys = f"""You are a Principal {language} Architect. 
+        Synthesize feedback and rewrite the code.
+        Your style is: Minimalist, Pragmatic, Professional.
+        """
 
         prompt = f"""
         ORIGINAL CODE:
@@ -76,12 +82,13 @@ class SpecialistSquad:
         3. Docs: {documentation_report}
 
         YOUR MISSION:
-        1. Refactor the code to address ALL points (make it faster, clean, and well-documented).
-        2. Create a top-level block comment (using {language} syntax) at the VERY TOP of the file.
-           - Summarize changes.
-           - Give specific guidance based on mistakes found.
-        3. Output ONLY the code. No markdown backticks.
+        1. Refactor the code to address valid points.
+        2. DO NOT add inline comments for every change. Only comment on complex logic.
+        3. Create a top-level block comment (using {language} syntax) at the VERY TOP.
+           - Format: Bullet points only.
+           - Content: Summary of changes and 1-2 critical tips.
+           - Tone: Direct and technical. No fluff (e.g., avoid "I have improved...").
+        4. Output ONLY the code. No markdown backticks.
         """
         raw = await self._call_llm(prompt, sys)
-        # Clean up markdown if the model returns it
         return raw.replace(f"```{language.lower()}", "").replace("```", "").strip()
