@@ -11,11 +11,15 @@ class Orchestrator:
     """The Manager that routes code to the correct language squad."""
     def __init__(self, api_key):
         self.client = genai.Client(api_key=api_key)
-        self.squad = SpecialistSquad(self.client)
         self.tools = CodeTools()
         
+        # Load the files Organization specific conventions/exceptions
         self.conventions = self._read_file("./docs/CONVENTIONS.md")
         self.exceptions = self._read_file("./docs/EXCEPTIONS.md")
+        # Load the new LLM-Instructive Constitution
+        self.constitution = self._read_file("./docs/LLM_CONSTITUTION.md")
+        # Pass constitution to the squad
+        self.squad = SpecialistSquad(self.client, self.constitution)
 
     def _read_file(self, path):
         p = Path(path)

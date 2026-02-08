@@ -5,17 +5,28 @@ MODEL_NAME = "gemini-2.5-flash"
 
 class SpecialistSquad:
     """A squad of specialized agents for polyglot code review."""
-    def __init__(self, client):
+    def __init__(self, client, constitution: str):
         self.client = client
+        self.constitution = constitution
 
-    async def _call_llm(self, prompt, system_instruction):
-        """Standard async wrapper for Gemini calls."""
+    async def _call_llm(self, prompt, role_instruction):
+        """
+        Combines the Global Constitution with the Specific Role Instruction.
+        """
+        combined_system_instruction = f"""
+        {self.constitution}
+        
+        ---
+        YOUR CURRENT SPECIFIC ROLE:
+        {role_instruction}
+        """
+
         response = await trio.to_thread.run_sync(
             lambda: self.client.models.generate_content(
                 model=MODEL_NAME, 
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
+                    system_instruction=combined_system_instruction,
                     temperature=0.2 
                 )
             )
@@ -25,7 +36,7 @@ class SpecialistSquad:
     # --- The Specialists ---
 
     async def optimizer_agent(self, code, language):
-        sys = f"You are a Senior Performance Engineer specialized in {language}. Your goal is Efficiency."
+        sys = f"You are the Performance Specialist for {language}. Your goal is Efficiency."
         prompt = f"""
         Analyze this code:
         {code}
@@ -38,8 +49,10 @@ class SpecialistSquad:
     async def enforcer_agent(self, code, language, conventions, exceptions):
         sys = f"You are the {language} Policy Enforcer. You uphold the Company CONVENTIONS strictly."
         prompt = f"""
-        Conventions: {conventions}
-        Exceptions: {exceptions}
+        Specific Local Conventions (Override Global Rules if conflicting): 
+        {conventions}
+        {exceptions}
+        
         Code:
         {code}
         
@@ -48,14 +61,13 @@ class SpecialistSquad:
         """
         return await self._call_llm(prompt, sys)
 
-
     async def documenter_agent(self, code, language):
         sys = f"You are the Lead Technical Writer for {language}. You hate redundancy."
         prompt = f"""
         Analyze this code:
         {code}
         
-        Task: Identify where comments are critical.
+        Task: Identify where comments are critical based on the 'No Magic' rule in the Constitution.
         Rules:
         1. IGNORE getters, setters, and obvious logic.
         2. ONLY flag complex algorithms or non-obvious business logic.
@@ -67,9 +79,8 @@ class SpecialistSquad:
 
     # --- The Mentor (Synthesis) ---
     async def mentor_agent(self, code, language, optimization_report, policy_report, documentation_report):
-        sys = f"""You are a Principal {language} Architect. 
+        sys = f"""You are the Principal {language} Architect. 
         Synthesize feedback and rewrite the code.
-        Your style is: Minimalist, Pragmatic, Professional.
         """
 
         prompt = f"""
@@ -83,11 +94,10 @@ class SpecialistSquad:
 
         YOUR MISSION:
         1. Refactor the code to address valid points.
-        2. DO NOT add inline comments for every change. Only comment on complex logic.
+        2. Strictly adhere to the GLOBAL CONSTRAINTS (Error handling, Security, Typing).
         3. Create a top-level block comment (using {language} syntax) at the VERY TOP.
            - Format: Bullet points only.
            - Content: Summary of changes and 1-2 critical tips.
-           - Tone: Direct and technical. No fluff (e.g., avoid "I have improved...").
         4. Output ONLY the code. No markdown backticks.
         """
         raw = await self._call_llm(prompt, sys)
