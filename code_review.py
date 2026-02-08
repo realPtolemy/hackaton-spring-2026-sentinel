@@ -1,7 +1,6 @@
 import os
 import trio
 import random
-import math
 from pathlib import Path
 from google import genai
 from dotenv import load_dotenv
@@ -12,7 +11,7 @@ load_dotenv()
 MAX_CONCURRENT_FILES = 5  # Limits how many files are processed at once
 MODEL_NAME = "gemini-2.0-flash"
 
-class AsyncReviewer:
+class AsyncMultiAgentReviewer:
     def __init__(self, api_key, convention_path="./docs/CONVENTIONS.md", exception_path="./docs/EXCEPTIONS.md"):
         self.client = genai.Client(api_key=api_key)
         self.conventions = self._load_file(convention_path)
@@ -69,7 +68,7 @@ class AsyncReviewer:
                     
                     attempt += 1
                     # Exponential backoff: 2, 4, 8... + random jitter
-                    sleep_time = (2 ** attempt) + random.uniform(0, 1)
+                    sleep_time = (4 ** attempt) + random.uniform(0, 1)
                     print(f"   ⏳ Rate limit hit. Retrying in {sleep_time:.2f}s...")
                     await trio.sleep(sleep_time) # Non-blocking sleep
                 else:
@@ -100,6 +99,7 @@ class AsyncReviewer:
         return rules
 
     async def _agent_detective(self, code, ruleset, language):
+        print(f"   🔎  The Detective is looking for styling violations for {language}...")
         prompt = f"""
         RULES: {ruleset}
         CODE: {code}
@@ -108,6 +108,7 @@ class AsyncReviewer:
         return await self._call_gemini(prompt, system_instruction=f"You are a Senior {language} Detective.")
 
     async def _agent_diplomat(self, code, violations, language):
+        print(f"   🤝🏼  The Diplomat is implementing the recommended changes for {language}...")
         prompt = f"""
         CONTEXT: The Detective found these violations: {violations}
         CRITICAL: Do NOT rename public functions or change method signatures.
@@ -156,13 +157,37 @@ class AsyncReviewer:
                 print(f"❌ {file_path.name}: Failed ({str(e)})")
                 results_list.append("Failed")
 
+    # --- SYNC WRAPPERS FOR STREAMLIT ---
+
+    def digest_conventions(self):
+        """Sync wrapper for the rules logic"""
+        # Since _agent_lawyer is async, we run it via trio
+        return trio.run(self._agent_lawyer, "General/Initial Analysis")
+
+    def refactor_code(self, file_path_str, code):
+        """Sync wrapper to process a single file string"""
+        path = Path(file_path_str)
+        language = self.get_language_context(path.suffix)
+        
+        async def _run_pipeline():
+            ruleset = await self._agent_lawyer(language)
+            violations = await self._agent_detective(code, ruleset, language)
+            
+            if "NO_VIOLATIONS" in violations:
+                return code
+            
+            return await self._agent_diplomat(code, violations, language)
+            
+        return trio.run(_run_pipeline)
+
+
 # --- MAIN TRIO ORCHESTRATOR ---
 
 async def main():
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key: raise ValueError("No API Key found")
 
-    reviewer = AsyncReviewer(api_key)
+    reviewer = AsyncMultiAgentReviewer(api_key)
     source_dir = Path("./src")
     extensions = {'.py', '.js', '.ts', '.go', '.java', '.cpp'}
     

@@ -7,3 +7,4 @@ clang-tidy
 cpplint
 streamlit
 yapf
+trio

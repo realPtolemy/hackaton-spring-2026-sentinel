@@ -2,7 +2,7 @@ import streamlit as st
 import os
 import subprocess
 from pathlib import Path
-from code_review import MultiAgentReviewer 
+from code_review import AsyncMultiAgentReviewer 
 
 # --- Config ---
 PR_SUFFIX = "_pr"
@@ -11,7 +11,7 @@ st.set_page_config(layout="wide", page_title="Multi-Agent Reviewer", page_icon="
 
 # Initialize the Engine
 if "reviewer" not in st.session_state:
-    st.session_state.reviewer = MultiAgentReviewer(api_key=os.getenv("GOOGLE_API_KEY"))
+    st.session_state.reviewer = AsyncMultiAgentReviewer(api_key=os.getenv("GOOGLE_API_KEY"))
 
 def get_git_modified_files():
     """Finds Modified, Added (Staged), and Untracked (New) files in WATCH_DIR."""
