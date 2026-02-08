@@ -8,3 +8,4 @@ cpplint
 streamlit
 yapf
 trio
+pygments
