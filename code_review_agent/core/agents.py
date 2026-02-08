@@ -9,16 +9,9 @@ class SpecialistSquad:
         self.client = client
         self.constitution = constitution
 
-    async def _call_llm(self, prompt, role_instruction):
+    async def _call_llm(self, prompt, system_instruction):
         """
         Combines the Global Constitution with the Specific Role Instruction.
-        """
-        combined_system_instruction = f"""
-        {self.constitution}
-        
-        ---
-        YOUR CURRENT SPECIFIC ROLE:
-        {role_instruction}
         """
 
         response = await trio.to_thread.run_sync(
@@ -26,7 +19,7 @@ class SpecialistSquad:
                 model=MODEL_NAME, 
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    system_instruction=combined_system_instruction,
+                    system_instruction=system_instruction,
                     temperature=0.2 
                 )
             )
@@ -67,8 +60,7 @@ class SpecialistSquad:
         Analyze this code:
         {code}
         
-        Task: Identify where comments are critical based on the 'No Magic' rule in the Constitution.
-        Rules:
+        Task: Identify where comments are critical.
         1. IGNORE getters, setters, and obvious logic.
         2. ONLY flag complex algorithms or non-obvious business logic.
         3. If the code is self-explanatory, return 'NO_COMMENTS_NEEDED'.
@@ -94,7 +86,7 @@ class SpecialistSquad:
 
         YOUR MISSION:
         1. Refactor the code to address valid points.
-        2. Strictly adhere to the GLOBAL CONSTRAINTS (Error handling, Security, Typing).
+        2. DO NOT add inline comments for every change. Only comment on complex logic.
         3. Create a top-level block comment (using {language} syntax) at the VERY TOP.
            - Format: Bullet points only.
            - Content: Summary of changes and 1-2 critical tips.
