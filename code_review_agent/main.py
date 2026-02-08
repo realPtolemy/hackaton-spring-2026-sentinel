@@ -4,26 +4,20 @@ from core.orchestrator import Orchestrator
 from state import UIState
 from views import render_hero_section, render_sidebar, render_diff_viewer
 
-# Page Config
 st.set_page_config(layout="wide", page_title="MAS Reviewer", page_icon="🛡️")
 
-# Initialize Orchestrator
 if "orchestrator" not in st.session_state:
     st.session_state.orchestrator = Orchestrator(api_key=os.getenv("GOOGLE_API_KEY"))
 
-# Main Logic
 def main():
-    # 1. Background Agent Work (Conventions)
     if "rules" not in st.session_state:
         st.session_state.rules = st.session_state.orchestrator.sync_digest_rules()
 
     render_hero_section(st.session_state.rules)
 
-    # 2. Sidebar
     modified_files = UIState.get_git_modified_files()
     render_sidebar(st.session_state.orchestrator, modified_files)
 
-    # 3. Main Review Logic
     proposals = UIState.get_active_proposals()
     
     if not proposals:
