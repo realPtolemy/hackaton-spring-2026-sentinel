@@ -94,28 +94,52 @@ class AsyncMultiAgentReviewer:
         can be changed.
         """
         
-        rules = await self._call_gemini(prompt, system_instruction="You are the 'Lawyer'.")
+        rules = await self._call_gemini(prompt, system_instruction="You are the code Lawyer.")
         self.rules_cache[language] = rules
         return rules
 
     async def _agent_detective(self, code, ruleset, language):
         print(f"   🔎  The Detective is looking for styling violations for {language}...")
         prompt = f"""
+        ROLE: Senior {language} code styling, error and bugs Detective.
         RULES: {ruleset}
         CODE: {code}
-        TASK: List semantic/style violations. Return 'NO_VIOLATIONS' if clean.
+        
+        TASK: List semantic/style violations.
+        
+        SPECIAL INSTRUCTION FOR GLOBALS:
+        If you see a NEW global variable or exported constant being defined:
+        1. Check strictly if the name is descriptive (e.g. 'MAX_RETRY_COUNT' is good, 'MAX' is bad).
+        2. If the name is generic/bad, flag it as a CRITICAL VIOLATION.
+        3. Do NOT allow generic globals to enter the codebase.
         """
-        return await self._call_gemini(prompt, system_instruction=f"You are a Senior {language} Detective.")
+        return await self._call_gemini(prompt)
+
 
     async def _agent_diplomat(self, code, violations, language):
-        print(f"   🤝🏼  The Diplomat is implementing the recommended changes for {language}...")
+        print(f"   🤝  The Diplomat is implementing the recommended changes for {language}...")
         prompt = f"""
-        CONTEXT: The Detective found these violations: {violations}
-        CRITICAL: Do NOT rename public functions or change method signatures.
-        ORIGINAL CODE: {code}
-        TASK: Rewrite the code to fix the violations. Return ONLY code.
+        ROLE: You are the 'Diplomat'. You act as a safe code-fixer.
+
+        INPUTS:
+        - ORIGINAL CODE: {code}
+        - VIOLATIONS FOUND: {violations}
+
+        TASK:
+        Rewrite the code to fix the violations, BUT YOU MUST ADHERE TO THIS HIERARCHY:
+        
+        1. [HIGHEST PRIORITY] PUBLIC API SAFETY:
+           - You are FORBIDDEN from changing the names or signatures of public functions, classes, or exported variables.
+           - If a violation asks you to rename a public function (e.g. "Rename GetUser to get_user"), you must IGNORE that violation.
+           - Only rename internal/private variables (e.g. inside a function body).
+
+        2. [LOWER PRIORITY] CODE STYLE:
+           - Fix all other violations (formatting, internal naming, logic optimizations).
+
+        OUTPUT:
+        Return ONLY the rewritten code.
         """
-        response_text = await self._call_gemini(prompt, system_instruction="You are the Diplomat.")
+        response_text = await self._call_gemini(prompt, system_instruction="You are the code Diplomat.")
         return response_text.replace("```" + language.lower(), "").replace("```", "").strip()
 
     # --- WORKER FUNCTION ---
@@ -212,7 +236,7 @@ async def main():
             nursery.start_soon(reviewer.process_single_file, file_path, limiter, results)
 
     # 4. The Auditor (Runs after the nursery closes, meaning all tasks finished)
-    print("\n🕵️‍♂️ The Auditor is checking for broken builds...")
+    print("\n🧾 The Auditor is checking for broken builds...")
     if "Failed" in results:
         print("🚨 Audit Failed: Some files crashed during review.")
     else:
